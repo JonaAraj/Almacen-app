@@ -30,6 +30,9 @@
         "projectId": "510bccaa-07f5-463f-8b91-b843ff1ed716"
       }
     },
-    "owner": "jonaraj"
+    "owner": "jonaraj",
+    "plugins": [
+      "expo-barcode-scanner"
+    ]
   }
 }

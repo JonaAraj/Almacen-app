@@ -11,17 +11,15 @@ import {
   Alert,
 } from "react-native";
 
-const API_URL = "http://192.168.1.13:3000";
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
 
+// Campos alineados con la tabla 'equipos' de squema.sql
 const CAMPOS = [
   { key: "numeroSerie", label: "Número de Serie", placeholder: "Ej. SN-2024-00123" },
-  { key: "modelo", label: "Modelo", placeholder: "Ej. Latitude 5420" },
+  { key: "tipoEquipo", label: "Tipo de Equipo", placeholder: "Laptop o Escritorio" },
   { key: "marca", label: "Marca", placeholder: "Ej. Dell" },
-  { key: "procesador", label: "Procesador", placeholder: "Ej. Intel Core i5-1135G7" },
-  { key: "almacenamiento", label: "Almacenamiento", placeholder: "Ej. 256GB SSD" },
-  { key: "fechaIngreso", label: "Fecha de Ingreso", placeholder: "Ej. 02/03/2026" },
+  { key: "modelo", label: "Modelo", placeholder: "Ej. Latitude 5420" },
 ];
 
 export default function Registro({ regresar }) {
@@ -73,12 +71,11 @@ export default function Registro({ regresar }) {
         "Prefer": "return=representation", // para recibir el registro creado
       },
       body: JSON.stringify({
+        // Cuerpo de la petición alineado con squema.sql
         numero_serie: form.numeroSerie,
+        tipo_equipo: form.tipoEquipo,
         modelo: form.modelo,
         marca: form.marca,
-        procesador: form.procesador,
-        almacenamiento: form.almacenamiento,
-        fecha_ingreso: form.fechaIngreso,
       }),
     });
 

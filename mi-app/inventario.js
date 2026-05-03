@@ -50,13 +50,6 @@ export default function Inventario({ cambiarPantalla, regresar }) {
       opacity: opacityBtn1,
     },
     {
-      label: "Registro",
-      pantalla: "inventario_registro",
-      icon: "📝",
-      slide: slideBtn2,
-      opacity: opacityBtn2,
-    },
-    {
       label: "Modificar",
       pantalla: "inventario_modificar",
       icon: "✏️",

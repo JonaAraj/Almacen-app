@@ -11,8 +11,10 @@ import {
   Alert,
 } from "react-native";
 import { jsPDF } from "jspdf";
+import QrScanner from "./components/QrReaderConstruct";
 
-const API_URL = "http://192.168.1.13:3000";
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
 
 const ITEMS = [
   "Estado físico correcto",
@@ -231,6 +233,7 @@ export default function RevisionInicial({ regresar }) {
   );
   const [savedId, setSavedId] = useState(null);
   const [guardando, setGuardando] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
 
   useEffect(() => {
     Animated.sequence([
@@ -268,7 +271,8 @@ export default function RevisionInicial({ regresar }) {
     const guardar = async () => {
   setGuardando(true);
   try {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/revisiones`, {
+    // Apuntamos a la tabla 'diagnosticos' y estructuramos el body según squema.sql
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/diagnosticos`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -277,25 +281,24 @@ export default function RevisionInicial({ regresar }) {
         "Prefer": "return=representation",
       },
       body: JSON.stringify({
+        // Asumimos que la tabla 'diagnosticos' también tiene 'numero_serie' para poder enlazar.
         numero_serie: numeroSerie,
-        estado_fisico_correcto: checked["Estado físico correcto"],
-        enciende: checked["Enciende"],
-        muestra_imagen: checked["Muestra imagen"],
-        arranca_sistema_operativo: checked["Arranca sistema operativo"],
-        carga_bateria: checked["Carga batería"],
-        disco_detectado: checked["Disco detectado"],
-        ram_detectada: checked["RAM detectada"],
-        ventilador_funciona: checked["Ventilador funciona"],
-        wifi_funciona: checked["WiFi funciona"],
-        total_completados: totalChecked,
+        // El checklist se anida en el campo JSONB 'detalles_revision'
+        detalles_revision: {
+          ...checked,
+          total_completados: totalChecked,
+        },
+        // Incluimos los otros campos del schema
+        estatus_final: totalChecked === ITEMS.length ? "Completado" : "Incompleto",
+        observaciones_extra: null,
       }),
     });
 
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || "Error al guardar");
 
-    setSavedId(data[0].id);
-    Alert.alert("✅ Guardado", `Revisión guardada.\nN/S: ${numeroSerie}`);
+    setSavedId(data[0].id_diagnostico); // El ID viene de la columna 'id_diagnostico'
+    Alert.alert("✅ Guardado", `Diagnóstico guardado.\nN/S: ${numeroSerie}`);
   } catch (err) {
     Alert.alert("❌ Error", err.message);
   } finally {
@@ -313,6 +316,32 @@ export default function RevisionInicial({ regresar }) {
       );
     } else {
       guardar();
+    }
+  };
+
+  // ── Leer QR y buscar equipo ──────────────────────────────────────────────
+  const handleQrScan = async (data) => {
+    setNumeroSerie(data);
+    setIsScanning(false); // Ocultamos la cámara después de leer
+    Alert.alert("QR Escaneado", `Número de serie: ${data}`);
+
+    // Buscar la información del producto en la base de datos
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/equipos?numero_serie=eq.${encodeURIComponent(data)}`, {
+        method: "GET",
+        headers: {
+          "apikey": SUPABASE_KEY,
+          "Authorization": `Bearer ${SUPABASE_KEY}`,
+        },
+      });
+      const equipo = await response.json();
+      if (equipo && equipo.length > 0) {
+        Alert.alert("Equipo encontrado", `Marca: ${equipo[0].marca}\nModelo: ${equipo[0].modelo}`);
+      } else {
+        Alert.alert("Atención", "Este equipo no se encuentra registrado.");
+      }
+    } catch (err) {
+      console.error("Error al buscar el equipo:", err);
     }
   };
 
@@ -349,6 +378,18 @@ export default function RevisionInicial({ regresar }) {
 
       <Animated.View style={{ opacity: fadeList, flex: 1 }}>
         <ScrollView showsVerticalScrollIndicator={false}>
+
+          <TouchableOpacity style={{ marginBottom: 20 }} activeOpacity={0.7} onPress={() => setIsScanning(!isScanning)}>
+            <View style={{ backgroundColor: "#1E293B", padding: 15, borderRadius: 12, alignItems: "center" }}>
+              <Text style={{ color: "#F1F5F9", fontWeight: "600" }}>{isScanning ? "Ocultar Cámara" : "📷 Escanear Código QR"}</Text>
+            </View>
+          </TouchableOpacity>
+
+          {isScanning && (
+            <View style={{ height: 300, marginBottom: 20, borderRadius: 12, overflow: "hidden" }}>
+              <QrScanner onScan={handleQrScan} />
+            </View>
+          )}
 
           {/* Campo número de serie */}
           <View style={styles.inputContainer}>
