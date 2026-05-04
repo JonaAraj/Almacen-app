@@ -1,41 +1,59 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-// IMPORTANTE: Ajusta esta ruta según la ubicación de tu conexión a PostgreSQL
-const pool = require('../db'); 
+const supabase = require("../config/supabase");
 
-router.post('/', async (req, res, next) => {
-    const { numeroSerie, modelo, marca, procesador, almacenamiento, fechaIngreso } = req.body;
-    const { numero_serie, tipo_equipo, modelo, marca } = req.body;
+router.post("/", async (req, res, next) => {
+  const {
+    numero_serie,
+    tipo_equipo,
+    modelo,
+    marca,
+    fecha_registro,
+    procesador,
+    almacenamiento,
+  } = req.body;
 
-    try {
-        // 1. Guardar el nuevo equipo en la tabla de equipos
-        const insertQuery = `
-            INSERT INTO equipos (numero_serie, modelo, marca, procesador, almacenamiento, fecha_ingreso)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            INSERT INTO equipos (numero_serie, tipo_equipo, modelo, marca)
-            VALUES ($1, $2, $3, $4)
-            RETURNING *;
-        `;
-        const equipoResult = await pool.query(insertQuery, [numeroSerie, modelo, marca, procesador, almacenamiento, fechaIngreso]);
-        const equipoResult = await pool.query(insertQuery, [numero_serie, tipo_equipo, modelo, marca]);
-        const nuevoEquipo = equipoResult.rows[0];
+  try {
+    // 1. Guardar el nuevo equipo usando la API de Supabase
+    const { data: nuevoEquipo, error: equipoError } = await supabase
+      .from("equipos")
+      .insert([{
+        numero_serie,
+        tipo_equipo,
+        modelo,
+        marca,
+        procesador,
+        almacenamiento,
+        fecha_registro: fecha_registro || new Date().toISOString()
+      }])
+      .select()
+      .single();
 
-        // 2. Identificar el reporte de diagnóstico asociado usando el número de serie
-        const revisionQuery = `
-            SELECT * FROM revisiones WHERE numero_serie = $1 ORDER BY id DESC LIMIT 1;
-            SELECT * FROM diagnosticos WHERE numero_serie = $1 ORDER BY created_at DESC LIMIT 1;
-        `;
-        const revisionResult = await pool.query(revisionQuery, [numeroSerie]);
-        const revisionResult = await pool.query(revisionQuery, [numero_serie]);
-        const revisionAsociada = revisionResult.rows.length > 0 ? revisionResult.rows[0] : null;
-
-        res.status(201).json({ ok: true, equipo: nuevoEquipo, revisionAsociada });
-    } catch (error) {
-        if (error.code === '23505') { // Código de PostgreSQL para errores de valores únicos duplicados
-            return res.status(400).json({ error: 'Ya existe un equipo registrado con ese número de serie' });
-        }
-        next(error);
+    if (equipoError) {
+      // "23505" es el código de PostgreSQL para errores de valores únicos duplicados (unique_violation)
+      if (equipoError.code === "23505") {
+        return res.status(400).json({ error: "Ya existe un equipo registrado con ese número de serie" });
+      }
+      throw equipoError; // Para que pase al bloque catch y de ahí al errorHandler
     }
+
+    // 2. Identificar el reporte de diagnóstico asociado usando el número de serie
+    const { data: revisionAsociada, error: revisionError } = await supabase
+      .from("diagnosticos")
+      .select("*")
+      .eq("numero_serie", numero_serie)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(); // maybeSingle() no arroja error si no encuentra coincidencias, retorna null
+
+    if (revisionError) {
+      throw revisionError;
+    }
+
+    res.status(201).json({ ok: true, equipo: nuevoEquipo, revisionAsociada: revisionAsociada || null });
+  } catch (error) {
+    next(error);
+  }
 });
 
 module.exports = router;
