@@ -32,7 +32,9 @@ app.use("/api/equipos", equiposRouter);
 
 app.use(errorHandler);
 
-app.listen(PORT, () => {
+console.log(`Iniciando backend en puerto ${PORT}`);
+
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor escuchando en el puerto ${PORT}`);
   console.log("Endpoints disponibles:");
   console.log(`   POST   http://localhost:${PORT}/api/revisiones`);

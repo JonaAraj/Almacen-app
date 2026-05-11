@@ -1,8 +1,0 @@
-services:
-  - type: web
-    name: almacen-app-backend
-    env: node
-    plan: free
-    rootDir: Back-end
-    buildCommand: npm install
-    startCommand: npm start
