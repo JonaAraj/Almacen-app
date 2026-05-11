@@ -181,6 +181,9 @@ git push
 # O usar Render Dashboard para Deploy
 ```
 
+> Asegúrate de que el servicio Render apunte a la carpeta `Back-end` como raíz.
+> Si usas `.render.yaml`, el rootDir ya quedará configurado automáticamente.
+
 **Ver [DEPLOYMENT.md](./DEPLOYMENT.md) para guía completa.**
 
 ---

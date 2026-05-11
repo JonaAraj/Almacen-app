@@ -44,9 +44,10 @@ NODE_ENV=production
 4. Configurar:
    - **Name**: `almacen-app-backend`
    - **Environment**: `Node`
-   - **Build Command**: `cd Back-end && npm install`
-   - **Start Command**: `cd Back-end && npm start`
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
    - **Plan**: Free (o Paid según necesidad)
+   - **Root Directory**: `Back-end`
 
 5. Agregar variables de entorno:
    - `SUPABASE_URL`

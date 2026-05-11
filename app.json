@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "mi-app",
-    "slug": "mi-app",
+    "slug": "almacen-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -20,14 +20,18 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.CAMERA"
+      ],
+      "package": "com.jonaraj.Almacenapp"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "extra": {
       "eas": {
-        "projectId": "510bccaa-07f5-463f-8b91-b843ff1ed716"
+        "projectId": "2ce9cefe-3eba-4ecf-abf0-b23b920adb30"
       },
       "apiUrl": "https://almacen-app-backend.onrender.com"
     },
