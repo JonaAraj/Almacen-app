@@ -1,12 +1,14 @@
-// Configuración de URLs para diferentes entornos
-const isDevelopment = __DEV__; // variable nativa de React Native
+import Constants from "expo-constants";
+
+const isDevelopment = __DEV__;
+const extra = Constants.expoConfig?.extra || Constants.manifest?.extra || {};
 
 const API_BASE_URL = isDevelopment
-  ? "http://localhost:3000" // Para desarrollo local
-  : process.env.REACT_APP_API_URL || "https://almacen-app-backend.onrender.com"; // Para producción
+  ? "http://localhost:3000"
+  : extra.apiUrl || "https://almacen-app-backend.onrender.com";
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || "https://sxpynaopbvsjfxfkrgeu.supabase.co";
-const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "";
+const SUPABASE_URL = extra.supabaseUrl || "https://sxpynaopbvsjfxfkrgeu.supabase.co";
+const SUPABASE_KEY = extra.supabaseKey || "";
 
 export const config = {
   API_BASE_URL,

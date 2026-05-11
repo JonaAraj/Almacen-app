@@ -44,8 +44,8 @@ NODE_ENV=production
 4. Configurar:
    - **Name**: `almacen-app-backend`
    - **Environment**: `Node`
-   - **Build Command**: `npm install`
-   - **Start Command**: `npm start` (o `node src/index.js`)
+   - **Build Command**: `cd Back-end && npm install`
+   - **Start Command**: `cd Back-end && npm start`
    - **Plan**: Free (o Paid según necesidad)
 
 5. Agregar variables de entorno:
@@ -58,6 +58,8 @@ NODE_ENV=production
 
 6. Hacer Deploy
 
+> Si Render detecta la rama raíz, el archivo `Procfile` en la raíz ya fuerza el inicio del servicio con `npm run backend:start`.
+>
 > El backend estará disponible en: `https://almacen-app-backend.onrender.com`
 
 ---
