@@ -3,6 +3,7 @@ import { View, StyleSheet } from "react-native";
 
 import Menu from "./mi-app/menu";
 import Inventario from "./mi-app/inventario";
+import InventarioModificar from "./mi-app/InventarioModificar";
 import RevisionInicial from "./mi-app/revisionInicial";
 import Registro from "./mi-app/registro";
 import Historial from "./mi-app/HistorialScreen"; 
@@ -41,11 +42,19 @@ export default function App() {
         <Historial 
           numeroSerie={equipoSeleccionado || "GENERAL"} 
           regresar={() => setPantalla("menu")} 
+        irAConsulta={(sn) => {
+          setEquipoSeleccionado(sn);
+          setPantalla("inventario_consulta");
+        }}
         />
       )}
 
       {pantalla === "inventario_consulta" && (
-        <Consulta regresar={() => setPantalla("inventario")} />
+        <Consulta regresar={() => setPantalla("inventario")} serieInicial={equipoSeleccionado} />
+      )}
+
+      {pantalla === "inventario_modificar" && (
+        <InventarioModificar regresar={() => setPantalla("inventario")} serieInicial={equipoSeleccionado} />
       )}
     </View>
   );

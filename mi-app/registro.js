@@ -11,8 +11,8 @@ import {
   Alert,
 } from "react-native";
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 
 // Campos alineados con la tabla 'equipos' de squema.sql
 const CAMPOS = [
@@ -62,6 +62,10 @@ export default function Registro({ regresar }) {
 
       setGuardando(true);
   try {
+    if (!SUPABASE_URL) {
+      throw new Error("La URL de base de datos no está configurada correctamente en el .env");
+    }
+
     const response = await fetch(`${SUPABASE_URL}/rest/v1/equipos`, {
       method: "POST",
       headers: {

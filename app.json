@@ -28,7 +28,8 @@
     "extra": {
       "eas": {
         "projectId": "510bccaa-07f5-463f-8b91-b843ff1ed716"
-      }
+      },
+      "apiUrl": "https://almacen-app-backend.onrender.com"
     },
     "owner": "jonaraj",
     "plugins": [

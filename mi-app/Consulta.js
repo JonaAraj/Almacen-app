@@ -1,19 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity, TextInput, StatusBar, Alert } from 'react-native';
 import QrScanner from "./components/QrReaderConstruct";
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 
-export default function Consulta({ regresar }) {
+export default function Consulta({ regresar, serieInicial }) {
     const [searchSerie, setSearchSerie] = useState("");
     const [consulta, setConsulta] = useState(null);
     const [loading, setLoading] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
 
+    useEffect(() => {
+        if (serieInicial) {
+            setSearchSerie(serieInicial);
+            buscarEquipo(serieInicial);
+        }
+    }, [serieInicial]);
+
+
     const buscarEquipo = async (serieStr) => {
-        const serie = serieStr || searchSerie;
-        if (!serie.trim()) {
+        // Garantizamos que tome el parámetro estricto (QR) o en su defecto el estado,
+        // evaluándolo en el instante exacto en que se ejecuta la función.
+        const valorBusqueda = typeof serieStr === 'string' ? serieStr : searchSerie;
+        const serieLimpiaLocal = valorBusqueda ? valorBusqueda.trim() : "";
+
+        if (!serieLimpiaLocal) {
             Alert.alert("Atención", "Por favor ingresa un número de serie.");
             return;
         }
@@ -21,26 +33,69 @@ export default function Consulta({ regresar }) {
         setLoading(true);
         setConsulta(null);
         try {
-            const response = await fetch(`${SUPABASE_URL}/rest/v1/equipos?numero_serie=eq.${serie}`, {
-                method: 'GET',
-                headers: {
-                    'apikey': SUPABASE_KEY,
-                    'Authorization': `Bearer ${SUPABASE_KEY}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            const data = await response.json();
-            if (data && data.length > 0) {
-                setConsulta(data[0]);
-            } else {
-                Alert.alert("Sin resultados", "No se encontró ningún equipo con ese número de serie.");
+            console.log(`🔍 Iniciando búsqueda para N/S: ${serieLimpiaLocal}`);
+            if (!SUPABASE_URL) {
+                Alert.alert("Error", "La URL de base de datos no está definida.");
+                return;
             }
+
+            const headers = {
+                apikey: SUPABASE_KEY,
+                Authorization: `Bearer ${SUPABASE_KEY}`,
+                "Content-Type": "application/json",
+            };
+
+            const encodedSerie = encodeURIComponent(serieLimpiaLocal);
+            const equiposUrl = `${SUPABASE_URL}/rest/v1/equipos?select=*&numero_serie=eq.${encodedSerie}`;
+            const diagnosticosUrl = `${SUPABASE_URL}/rest/v1/diagnosticos?select=*&numero_serie=eq.${encodedSerie}&order=created_at.desc&limit=1`;
+
+            console.log("📡 Realizando peticiones GET a Supabase: equipos + diagnosticos...");
+            const [responseEquipos, responseDiagnosticos] = await Promise.all([
+                fetch(equiposUrl, { method: 'GET', headers }),
+                fetch(diagnosticosUrl, { method: 'GET', headers }),
+            ]);
+
+            console.log("📥 Status Equipos:", responseEquipos.status, "Diagnósticos:", responseDiagnosticos.status);
+
+            if (!responseEquipos.ok || !responseDiagnosticos.ok) {
+                const textEquipo = responseEquipos.ok ? null : await responseEquipos.text();
+                const textDiagnostico = responseDiagnosticos.ok ? null : await responseDiagnosticos.text();
+                console.error("Error API equipos:", textEquipo, "Error API diagnosticos:", textDiagnostico);
+                throw new Error("Error en la respuesta de la base de datos.");
+            }
+
+            const dataEquipos = await responseEquipos.json();
+            const dataDiagnosticos = await responseDiagnosticos.json();
+
+            const equipo = Array.isArray(dataEquipos) && dataEquipos.length > 0 ? dataEquipos[0] : null;
+            const diagnostico = Array.isArray(dataDiagnosticos) && dataDiagnosticos.length > 0 ? dataDiagnosticos[0] : null;
+
+            console.log("📊 Resultados:", {
+                equipo: equipo ? true : false,
+                diagnostico: diagnostico ? true : false,
+            });
+
+            if (!equipo && !diagnostico) {
+                Alert.alert("Sin resultados", "No se encontró ningún equipo o diagnóstico con ese número de serie.");
+                return;
+            }
+
+            setConsulta({
+                numero_serie: serieLimpiaLocal,
+                ...equipo,
+                diagnostico,
+            });
         } catch (err) {
             console.error(err);
             Alert.alert("Error", "Ocurrió un error de red al buscar el equipo.");
         } finally {
             setLoading(false);
         }
+    };
+
+    // Handler robusto para asegurar la llamada correcta desde los botones
+    const handleBuscar = () => {
+        buscarEquipo(searchSerie);
     };
 
     const handleQrScan = (data) => {
@@ -86,12 +141,13 @@ export default function Consulta({ regresar }) {
                             placeholderTextColor="#475569"
                             value={searchSerie}
                             onChangeText={setSearchSerie}
+                            onSubmitEditing={handleBuscar}
                             autoCapitalize="characters"
                         />
                     </View>
                     <TouchableOpacity 
                         style={styles.searchBtn} 
-                        onPress={() => buscarEquipo()}
+                        onPress={handleBuscar}
                         disabled={loading}
                     >
                         <Text style={styles.searchBtnText}>Buscar</Text>
@@ -105,6 +161,11 @@ export default function Consulta({ regresar }) {
                     <View style={styles.resultCard}>
                         <Text style={styles.resultTitle}>N/S: {consulta.numero_serie}</Text>
                         
+                        <Text style={styles.sectionSubtitle}>DATOS DEL EQUIPO</Text>
+                        <View style={styles.resultRow}>
+                            <Text style={styles.resultLabel}>Tipo</Text>
+                            <Text style={styles.resultValue}>{consulta.tipo_equipo || "N/A"}</Text>
+                        </View>
                         <View style={styles.resultRow}>
                             <Text style={styles.resultLabel}>Marca</Text>
                             <Text style={styles.resultValue}>{consulta.marca || "N/A"}</Text>
@@ -122,11 +183,56 @@ export default function Consulta({ regresar }) {
                             <Text style={styles.resultValue}>{consulta.almacenamiento || "N/A"}</Text>
                         </View>
                         <View style={styles.resultRow}>
+                            <Text style={styles.resultLabel}>Dueño / Asignado a</Text>
+                            <Text style={styles.resultValue}>{consulta.dueno || "N/A"}</Text>
+                        </View>
+                        <View style={styles.resultRow}>
                             <Text style={styles.resultLabel}>Fecha de Ingreso</Text>
                             <Text style={styles.resultValue}>
                                 {consulta.fecha_ingreso ? new Date(consulta.fecha_ingreso).toLocaleDateString() : "N/A"}
                             </Text>
                         </View>
+                        <View style={[styles.resultRow, { borderBottomWidth: 0 }]}>
+                            <Text style={styles.resultLabel}>Fecha de Registro</Text>
+                            <Text style={styles.resultValue}>
+                                {consulta.fecha_registro ? new Date(consulta.fecha_registro).toLocaleDateString() : "N/A"}
+                            </Text>
+                        </View>
+
+                        {/* Sección de Diagnóstico */}
+                        <View style={styles.innerDivider} />
+                        <Text style={styles.sectionSubtitle}>ÚLTIMO DIAGNÓSTICO</Text>
+                        
+                        {consulta.diagnostico ? (
+                            <>
+                                <View style={styles.resultRow}>
+                                    <Text style={styles.resultLabel}>Estatus Final</Text>
+                                    <Text style={[styles.resultValue, { color: consulta.diagnostico.estatus_final === 'Completado' ? '#4ADE80' : '#FBBF24' }]}>
+                                        {consulta.diagnostico.estatus_final || "N/A"}
+                                    </Text>
+                                </View>
+                                <View style={styles.resultRow}>
+                                    <Text style={styles.resultLabel}>Checks Completados</Text>
+                                    <Text style={styles.resultValue}>
+                                        {consulta.diagnostico.detalles_revision?.total_completados ?? 0} / 9
+                                    </Text>
+                                </View>
+                                <View style={styles.resultRow}>
+                                    <Text style={styles.resultLabel}>Observaciones</Text>
+                                    <Text style={styles.resultValue}>
+                                        {consulta.diagnostico.observaciones_extra || "Ninguna"}
+                                    </Text>
+                                </View>
+                                <View style={[styles.resultRow, { borderBottomWidth: 0 }]}>
+                                    <Text style={styles.resultLabel}>Fecha de Revisión</Text>
+                                    <Text style={styles.resultValue}>
+                                        {new Date(consulta.diagnostico.created_at).toLocaleDateString()}
+                                    </Text>
+                                </View>
+                            </>
+                        ) : (
+                            <Text style={styles.emptyText}>No hay diagnósticos registrados para este equipo.</Text>
+                        )}
                     </View>
                 ) : null}
 
@@ -270,6 +376,30 @@ const styles = StyleSheet.create({
         color: "#F1F5F9",
         fontSize: 14,
         fontWeight: "500",
+        flex: 1,
+        textAlign: "right",
+        marginLeft: 10,
+    },
+    sectionSubtitle: {
+        color: "#60A5FA",
+        fontSize: 12,
+        fontWeight: "700",
+        letterSpacing: 1.5,
+        marginBottom: 6,
+        marginTop: 10,
+    },
+    innerDivider: {
+        height: 1,
+        backgroundColor: "#334155",
+        marginVertical: 14,
+        width: "100%",
+    },
+    emptyText: {
+        color: "#94A3B8",
+        fontSize: 13,
+        fontStyle: "italic",
+        textAlign: "center",
+        marginTop: 10,
     },
     backButton: {
         alignItems: "center",

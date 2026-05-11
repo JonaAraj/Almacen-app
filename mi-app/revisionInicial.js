@@ -13,8 +13,8 @@ import {
 import { jsPDF } from "jspdf";
 import QrScanner from "./components/QrReaderConstruct";
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 
 const ITEMS = [
   "Estado físico correcto",
@@ -271,6 +271,10 @@ export default function RevisionInicial({ regresar }) {
     const guardar = async () => {
   setGuardando(true);
   try {
+    if (!SUPABASE_URL) {
+      throw new Error("La configuración de la base de datos (SUPABASE_URL) no está definida.");
+    }
+
     // Apuntamos a la tabla 'diagnosticos' y estructuramos el body según squema.sql
     const response = await fetch(`${SUPABASE_URL}/rest/v1/diagnosticos`, {
       method: "POST",
@@ -327,6 +331,11 @@ export default function RevisionInicial({ regresar }) {
 
     // Buscar la información del producto en la base de datos
     try {
+      if (!SUPABASE_URL) {
+        Alert.alert("Error", "Variables de base de datos no definidas.");
+        return;
+      }
+
       const response = await fetch(`${SUPABASE_URL}/rest/v1/equipos?numero_serie=eq.${encodeURIComponent(data)}`, {
         method: "GET",
         headers: {

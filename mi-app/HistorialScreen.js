@@ -1,18 +1,64 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity, StatusBar } from 'react-native';
-import { getHistorialPorEquipos } from '../Back-end/src/services/Api'; 
 
-export default function Historial({ numeroSerie, regresar }) {
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+
+
+export default function Historial({ numeroSerie, regresar, irAConsulta }) {
   const [historial, setHistorial] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const cargarDatos = async () => {
       try {
-        const data = await getHistorialPorEquipos(numeroSerie);
-        setHistorial(data);
+        setLoading(true);
+
+        if (!SUPABASE_URL) {
+          throw new Error("SUPABASE_URL es undefined. Revisa que tu archivo .env use el prefijo EXPO_PUBLIC_");
+        }
+        
+        let urlEquipos = `${SUPABASE_URL}/rest/v1/equipos?select=*`;
+        let urlDiagnosticos = `${SUPABASE_URL}/rest/v1/diagnosticos?select=*`;
+
+        if (numeroSerie && numeroSerie !== "GENERAL") {
+          const encodedSerie = encodeURIComponent(numeroSerie);
+          urlEquipos += `&numero_serie=eq.${encodedSerie}`;
+          urlDiagnosticos += `&numero_serie=eq.${encodedSerie}`;
+        }
+
+        urlEquipos += `&order=fecha_registro.desc&limit=50`;
+        urlDiagnosticos += `&order=created_at.desc&limit=50`;
+
+        const headers = {
+          "apikey": SUPABASE_KEY,
+          "Authorization": `Bearer ${SUPABASE_KEY}`,
+          "Content-Type": "application/json",
+        };
+
+        const [resEquipos, resDiagnosticos] = await Promise.all([
+          fetch(urlEquipos, { headers }),
+          fetch(urlDiagnosticos, { headers })
+        ]);
+
+        if (!resEquipos.ok || !resDiagnosticos.ok) {
+          const errText = !resEquipos.ok ? await resEquipos.text() : await resDiagnosticos.text();
+          console.error("Respuesta fallida de Supabase:", errText);
+          throw new Error("Error en la respuesta de Supabase");
+        }
+
+        const dataEquipos = await resEquipos.json();
+        const dataDiagnosticos = await resDiagnosticos.json();
+
+        const feed = [
+          ...(Array.isArray(dataEquipos) ? dataEquipos.map(e => ({ ...e, type: 'equipo', date: e.fecha_registro || e.created_at || new Date().toISOString() })) : []),
+          ...(Array.isArray(dataDiagnosticos) ? dataDiagnosticos.map(d => ({ ...d, type: 'diagnostico', date: d.created_at || new Date().toISOString() })) : [])
+        ];
+
+        feed.sort((a, b) => new Date(b.date) - new Date(a.date));
+        setHistorial(feed);
       } catch (err) {
-        console.error(err);
+        console.error("Error al cargar historial:", err);
       } finally {
         setLoading(false);
       }
@@ -44,28 +90,44 @@ export default function Historial({ numeroSerie, regresar }) {
               <Text style={styles.emptyText}>No hay registros de diagnósticos para este equipo.</Text>
             </View>
           ) : (
-            historial.map((item) => (
-              <View key={item.id_diagnostico} style={styles.card}>
+            historial.map((item, index) => (
+            <TouchableOpacity 
+              key={`${item.type}-${item.id_diagnostico || item.numero_serie}-${index}`} 
+              style={styles.card}
+              activeOpacity={0.7}
+              onPress={() => irAConsulta && irAConsulta(item.numero_serie)}
+            >
                 
                 {/* Fecha en la parte superior de la tarjeta */}
                 <View style={styles.cardHeader}>
+                  <Text style={styles.badgeTypeText}>
+                  {item.type === 'equipo' ? "🆕 Equipo Agregado" : "🛠 Diagnóstico Realizado"}
+                </Text>
                   <Text style={styles.fechaText}>
-                    📅 {new Date(item.created_at).toLocaleDateString()} - {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    📅 {new Date(item.date).toLocaleDateString()} - {new Date(item.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </Text>
                 </View>
 
                 <View style={styles.resultRow}>
-                  <Text style={styles.resultLabel}>Técnico</Text>
-                  <Text style={styles.resultValue}>{item.empleados?.nombre_completo || "Desconocido"}</Text>
-                </View>
+                  <Text style={styles.resultLabel}>N/S</Text>
+                <Text style={styles.resultValue}>{item.numero_serie}</Text>
+                    </View>
                 
+                {item.type === 'equipo' ? (
+                <View style={[styles.resultRow, { borderBottomWidth: 0, paddingBottom: 0 }]}>
+                  <Text style={styles.resultLabel}>Modelo</Text>
+                  <Text style={styles.resultValue}>{item.marca} {item.modelo}</Text>
+                </View>
+              ) : (
                 <View style={[styles.resultRow, { borderBottomWidth: 0, paddingBottom: 0 }]}>
                   <Text style={styles.resultLabel}>Estatus Final</Text>
                   <Text style={styles.resultValue}>{item.estatus_final || "Sin estatus"}</Text>
                 </View>
-              </View>
-            ))
-          )}
+              )}
+            </TouchableOpacity>
+          ))
+            )
+          }
         </ScrollView>
       )}
 
@@ -157,6 +219,14 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: "#334155",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  badgeTypeText: {
+    color: "#F1F5F9",
+    fontSize: 13,
+    fontWeight: "600",
   },
   fechaText: {
     color: "#60A5FA",

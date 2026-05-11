@@ -53,8 +53,8 @@ export default function Inventario({ cambiarPantalla, regresar }) {
       label: "Modificar",
       pantalla: "inventario_modificar",
       icon: "✏️",
-      slide: slideBtn3,
-      opacity: opacityBtn3,
+      slide: slideBtn2,
+      opacity: opacityBtn2,
     },
   ];
 

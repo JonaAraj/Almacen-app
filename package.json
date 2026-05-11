@@ -1,12 +1,19 @@
 {
-  "name": "mi-app",
+  "name": "almacen-app",
   "version": "1.0.0",
+  "description": "Sistema de gestión de inventario de equipos - Almacén App",
   "main": "index.js",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "backend": "cd Back-end && npm run dev",
+    "backend:start": "cd Back-end && npm start",
+    "dev": "concurrently \"npm run backend\" \"npm start\"",
+    "build:apk": "eas build --platform android",
+    "build:apk:local": "eas build --platform android --local",
+    "eas:login": "eas login"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
