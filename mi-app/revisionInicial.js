@@ -10,7 +10,7 @@ import {
   TextInput,
   Alert,
 } from "react-native";
-import { jsPDF } from "jspdf";
+import * as Print from "expo-print";
 import QrScanner from "./components/QrReaderConstruct";
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -28,198 +28,258 @@ const ITEMS = [
   "WiFi funciona",
 ];
 
-// ─── PDF GENERATOR ──────────────────────────────────────────────────────────
-const generarPDF = ({ numeroSerie, checked, totalChecked }) => {
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-  const margin = 20;
-  const contentW = pageW - margin * 2;
-
-  // ── Background ──────────────────────────────────────────────────────────
-  doc.setFillColor(15, 23, 42); // #0F172A
-  doc.rect(0, 0, pageW, pageH, "F");
-
-  // ── Header band ─────────────────────────────────────────────────────────
-  doc.setFillColor(30, 58, 95); // #1E3A5F
-  doc.roundedRect(margin, 14, contentW, 40, 4, 4, "F");
-
-  // Badge pill
-  doc.setFillColor(37, 99, 235); // #2563EB
-  doc.roundedRect(margin + 6, 18, 58, 7, 3, 3, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(255, 255, 255);
-  doc.text("DIAGNÓSTICO DE EQUIPO", margin + 35, 23, { align: "center" });
-
-  // Title
-  doc.setFontSize(26);
-  doc.setTextColor(241, 245, 249); // #F1F5F9
-  doc.setFont("helvetica", "bold");
-  doc.text("REVISIÓN", margin + 10, 40);
-
-  doc.setTextColor(37, 99, 235); // #2563EB
-  doc.text("INICIAL", margin + 10 + doc.getTextWidth("REVISIÓN ") - 2, 40);
-
-  // Divider line
-  doc.setDrawColor(37, 99, 235);
-  doc.setLineWidth(1);
-  doc.line(margin + 10, 43, margin + 10 + 20, 43);
-
-  // Date stamp (top-right of header)
+// ─── PDF GENERATOR (usando expo-print) ──────────────────────────────────────
+const generarPDF = async ({ numeroSerie, checked, totalChecked }) => {
   const now = new Date();
   const dateStr = now.toLocaleDateString("es-MX", {
     day: "2-digit",
     month: "long",
     year: "numeric",
   });
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(148, 163, 184); // #94A3B8
-  doc.text(dateStr, pageW - margin - 6, 23, { align: "right" });
-  doc.text(
-    now.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }),
-    pageW - margin - 6,
-    30,
-    { align: "right" }
-  );
-
-  // ── Serial number block ──────────────────────────────────────────────────
-  let y = 64;
-  doc.setFillColor(30, 41, 59); // #1E293B
-  doc.roundedRect(margin, y, contentW, 18, 3, 3, "F");
-  doc.setDrawColor(51, 65, 85); // #334155
-  doc.setLineWidth(0.4);
-  doc.roundedRect(margin, y, contentW, 18, 3, 3, "S");
-
-  doc.setFontSize(7.5);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(148, 163, 184);
-  doc.text("NÚMERO DE SERIE", margin + 8, y + 6);
-
-  doc.setFontSize(13);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(241, 245, 249);
-  doc.text(numeroSerie || "—", margin + 8, y + 14);
-
-  // ── Progress summary ────────────────────────────────────────────────────
-  y += 26;
-
-  const pct = Math.round((totalChecked / ITEMS.length) * 100);
-
-  // Label
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(148, 163, 184);
-  doc.text(`COMPLETADOS: ${totalChecked} / ${ITEMS.length}`, margin, y + 4);
-
-  // Percentage badge
-  const badgeColor =
-    pct === 100 ? [22, 163, 74] : pct >= 50 ? [234, 179, 8] : [220, 38, 38];
-  doc.setFillColor(...badgeColor);
-  doc.roundedRect(pageW - margin - 22, y - 1, 22, 8, 2, 2, "F");
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(255, 255, 255);
-  doc.text(`${pct}%`, pageW - margin - 11, y + 5, { align: "center" });
-
-  // Bar background
-  y += 10;
-  doc.setFillColor(30, 41, 59);
-  doc.roundedRect(margin, y, contentW, 4, 2, 2, "F");
-  // Bar fill
-  doc.setFillColor(37, 99, 235);
-  if (pct > 0) {
-    doc.roundedRect(margin, y, (contentW * pct) / 100, 4, 2, 2, "F");
-  }
-
-  // ── Checklist items ──────────────────────────────────────────────────────
-  y += 12;
-
-  ITEMS.forEach((item, i) => {
-    const isDone = checked[item];
-
-    // Row background
-    doc.setFillColor(isDone ? 30 : 22, isDone ? 58 : 41, isDone ? 95 : 59);
-    doc.roundedRect(margin, y, contentW, 13, 2.5, 2.5, "F");
-
-    // Border
-    doc.setDrawColor(isDone ? 37 : 51, isDone ? 99 : 65, isDone ? 235 : 85);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(margin, y, contentW, 13, 2.5, 2.5, "S");
-
-    // Checkbox
-    const cbX = margin + 6;
-    const cbY = y + 3;
-    if (isDone) {
-      doc.setFillColor(37, 99, 235);
-      doc.roundedRect(cbX, cbY, 7, 7, 1.5, 1.5, "F");
-      // Checkmark — drawn with lines
-      doc.setDrawColor(255, 255, 255);
-      doc.setLineWidth(0.9);
-      doc.line(cbX + 1.5, cbY + 3.5, cbX + 3, cbY + 5.5);
-      doc.line(cbX + 3, cbY + 5.5, cbX + 5.5, cbY + 1.5);
-    } else {
-      doc.setFillColor(30, 41, 59);
-      doc.roundedRect(cbX, cbY, 7, 7, 1.5, 1.5, "F");
-      doc.setDrawColor(71, 85, 105); // #475569
-      doc.setLineWidth(0.4);
-      doc.roundedRect(cbX, cbY, 7, 7, 1.5, 1.5, "S");
-    }
-
-    // Item label
-    doc.setFontSize(10);
-    doc.setFont("helvetica", isDone ? "bolditalic" : "normal");
-    doc.setTextColor(isDone ? 96 : 203, isDone ? 165 : 213, isDone ? 250 : 225);
-    doc.text(item, cbX + 11, y + 8.5);
-
-    // Status tag
-    const tagW = isDone ? 16 : 18;
-    const tagColor = isDone ? [22, 163, 74] : [100, 116, 139];
-    doc.setFillColor(...tagColor);
-    doc.roundedRect(pageW - margin - tagW - 4, y + 3, tagW, 7, 1.5, 1.5, "F");
-    doc.setFontSize(6.5);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(255, 255, 255);
-    doc.text(
-      isDone ? "OK" : "FALTA",
-      pageW - margin - tagW / 2 - 4,
-      y + 8,
-      { align: "center" }
-    );
-
-    y += 16;
-
-    // New page if needed (leave room for footer)
-    if (y > pageH - 30 && i < ITEMS.length - 1) {
-      doc.addPage();
-      doc.setFillColor(15, 23, 42);
-      doc.rect(0, 0, pageW, pageH, "F");
-      y = 20;
-    }
+  const timeStr = now.toLocaleTimeString("es-MX", {
+    hour: "2-digit",
+    minute: "2-digit",
   });
 
-  // ── Footer ───────────────────────────────────────────────────────────────
-  const footerY = pageH - 14;
-  doc.setDrawColor(37, 99, 235);
-  doc.setLineWidth(0.3);
-  doc.line(margin, footerY - 4, pageW - margin, footerY - 4);
+  const pct = Math.round((totalChecked / ITEMS.length) * 100);
+  const barColor =
+    pct === 100 ? "#16a34a" : pct >= 50 ? "#eab308" : "#dc2626";
 
-  doc.setFontSize(7.5);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(100, 116, 139);
-  doc.text("Reporte generado automáticamente · Sistema de Diagnóstico", margin, footerY);
-  doc.text(
-    `N/S: ${numeroSerie}`,
-    pageW - margin,
-    footerY,
-    { align: "right" }
-  );
+  const itemsHTML = ITEMS.map((item) => {
+    const isDone = checked[item];
+    const statusColor = isDone ? "#16a34a" : "#64748b";
+    const statusText = isDone ? "OK" : "FALTA";
+    return `
+      <tr style="background-color: ${isDone ? "#1e3a5f" : "#1a1f2e"}; border-bottom: 1px solid #334155;">
+        <td style="padding: 12px; border-radius: 4px; width: 8%;">
+          <div style="width: 20px; height: 20px; border: 2px solid ${isDone ? "#2563eb" : "#475569"}; border-radius: 3px; background-color: ${isDone ? "#2563eb" : "transparent"}; display: flex; align-items: center; justify-content: center;">
+            ${isDone ? '<span style="color: white; font-weight: bold;">✓</span>' : ""}
+          </div>
+        </td>
+        <td style="padding: 12px; color: ${isDone ? "#60a5fa" : "#cbd5e1"}; font-weight: ${isDone ? "bold" : "normal"}; flex: 1;">
+          ${item}
+        </td>
+        <td style="padding: 12px; text-align: center; width: 12%;">
+          <span style="background-color: ${statusColor}; color: white; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+            ${statusText}
+          </span>
+        </td>
+      </tr>
+    `;
+  }).join("");
 
-  // ── Save ─────────────────────────────────────────────────────────────────
-  const fileName = `revision_${numeroSerie || "sin-serie"}_${Date.now()}.pdf`;
-  doc.save(fileName);
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <style>
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        body {
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          background-color: #0f172a;
+          color: #f1f5f9;
+          padding: 20px;
+        }
+        .container {
+          max-width: 800px;
+          margin: 0 auto;
+          background-color: #0f172a;
+        }
+        .header {
+          background: linear-gradient(135deg, #1e3a5f 0%, #2d5a8c 100%);
+          padding: 30px;
+          border-radius: 8px;
+          margin-bottom: 30px;
+          border-left: 4px solid #2563eb;
+        }
+        .badge {
+          background-color: #2563eb;
+          color: white;
+          padding: 6px 16px;
+          border-radius: 20px;
+          display: inline-block;
+          font-size: 12px;
+          font-weight: bold;
+          margin-bottom: 12px;
+        }
+        .title {
+          font-size: 32px;
+          font-weight: bold;
+          color: #f1f5f9;
+          margin-bottom: 4px;
+        }
+        .title-accent {
+          font-size: 32px;
+          font-weight: bold;
+          color: #2563eb;
+          margin-bottom: 12px;
+        }
+        .divider {
+          width: 60px;
+          height: 3px;
+          background-color: #2563eb;
+          border-radius: 2px;
+        }
+        .meta {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-top: 16px;
+          padding-top: 16px;
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+          font-size: 12px;
+          color: #94a3b8;
+        }
+        .serial-block {
+          background-color: #1e293b;
+          padding: 20px;
+          border-radius: 8px;
+          margin-bottom: 20px;
+          border: 1px solid #334155;
+        }
+        .serial-label {
+          font-size: 12px;
+          font-weight: bold;
+          color: #94a3b8;
+          margin-bottom: 8px;
+          text-transform: uppercase;
+        }
+        .serial-value {
+          font-size: 24px;
+          font-weight: bold;
+          color: #f1f5f9;
+        }
+        .progress-section {
+          margin-bottom: 30px;
+        }
+        .progress-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+        }
+        .progress-label {
+          font-size: 12px;
+          font-weight: bold;
+          color: #94a3b8;
+          text-transform: uppercase;
+        }
+        .progress-badge {
+          background-color: ${barColor};
+          color: white;
+          padding: 6px 12px;
+          border-radius: 4px;
+          font-size: 12px;
+          font-weight: bold;
+        }
+        .progress-bar {
+          background-color: #1e293b;
+          height: 10px;
+          border-radius: 5px;
+          overflow: hidden;
+          border: 1px solid #334155;
+        }
+        .progress-fill {
+          background-color: #2563eb;
+          height: 100%;
+          width: ${pct}%;
+          border-radius: 5px;
+        }
+        .checklist {
+          margin-bottom: 30px;
+        }
+        .checklist-title {
+          font-size: 14px;
+          font-weight: bold;
+          color: #f1f5f9;
+          margin-bottom: 16px;
+          text-transform: uppercase;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        tr {
+          display: flex;
+          align-items: center;
+        }
+        td {
+          display: inline-flex;
+          align-items: center;
+        }
+        .footer {
+          padding: 16px;
+          border-top: 1px solid #334155;
+          font-size: 11px;
+          color: #94a3b8;
+          text-align: center;
+          margin-top: 40px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="badge">DIAGNÓSTICO DE EQUIPO</div>
+          <div style="display: flex; align-items: baseline;">
+            <span class="title">REVISIÓN</span>
+            <span class="title-accent" style="margin-left: 8px;">INICIAL</span>
+          </div>
+          <div class="divider"></div>
+          <div class="meta">
+            <div>
+              <strong>${dateStr}</strong><br>${timeStr}
+            </div>
+            <div style="text-align: right;">
+              N/S: <strong>${numeroSerie}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="serial-block">
+          <div class="serial-label">Número de Serie</div>
+          <div class="serial-value">${numeroSerie}</div>
+        </div>
+
+        <div class="progress-section">
+          <div class="progress-header">
+            <span class="progress-label">Completados: ${totalChecked} / ${ITEMS.length}</span>
+            <span class="progress-badge">${pct}%</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill"></div>
+          </div>
+        </div>
+
+        <div class="checklist">
+          <div class="checklist-title">Lista de Verificación</div>
+          <table>
+            ${itemsHTML}
+          </table>
+        </div>
+
+        <div class="footer">
+          <p>Reporte generado automáticamente · Sistema de Diagnóstico de Equipos</p>
+          <p>${dateStr} a las ${timeStr}</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  try {
+    await Print.printAsync({
+      html,
+      fileName: `revision_${numeroSerie}_${Date.now()}`,
+    });
+  } catch (err) {
+    throw new Error("Error al generar PDF: " + err.message);
+  }
 };
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -354,8 +414,8 @@ export default function RevisionInicial({ regresar }) {
     }
   };
 
-  // ── Generar PDF local con jsPDF ──────────────────────────────────────────
-  const handleDescargarPDF = () => {
+  // ── Generar PDF local con expo-print ────────────────────────────────────
+  const handleDescargarPDF = async () => {
     if (!numeroSerie.trim()) {
       Alert.alert(
         "Campo requerido",
@@ -365,7 +425,8 @@ export default function RevisionInicial({ regresar }) {
     }
 
     try {
-      generarPDF({ numeroSerie, checked, totalChecked });
+      await generarPDF({ numeroSerie, checked, totalChecked });
+      Alert.alert("✅ PDF Generado", "El PDF se ha generado correctamente.");
     } catch (err) {
       Alert.alert("❌ Error al generar PDF", err.message);
     }
