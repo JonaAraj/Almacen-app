@@ -4,11 +4,11 @@
     "slug": "almacen-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./mi-app/assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./mi-app/assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -17,27 +17,24 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./mi-app/assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
         "android.permission.CAMERA"
       ],
-      "package": "com.jonaraj.Almacenapp"
+      "package": "com.jonaraj.almacenapp"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./mi-app/assets/favicon.png"
     },
     "extra": {
       "eas": {
         "projectId": "2ce9cefe-3eba-4ecf-abf0-b23b920adb30"
       },
-      "apiUrl": "https://almacen-app-backend.onrender.com"
+      "apiUrl": "https://almacen-app-1.onrender.com"
     },
-    "owner": "jonaraj",
-    "plugins": [
-      "expo-barcode-scanner"
-    ]
+    "owner": "jonaraj"
   }
 }

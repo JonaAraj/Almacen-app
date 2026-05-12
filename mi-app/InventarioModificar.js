@@ -81,8 +81,8 @@ export default function InventarioModificar({ regresar, serieInicial }) {
       return;
     }
 
-    if (!SUPABASE_URL) {
-      Alert.alert("Error", "SUPABASE_URL no está configurada.");
+    if (!config.API_BASE_URL) {
+      Alert.alert("Error", "La URL de la API no está configurada.");
       return;
     }
 
@@ -129,8 +129,8 @@ export default function InventarioModificar({ regresar, serieInicial }) {
     setGuardando(true);
 
     try {
-      if (!SUPABASE_URL) {
-        throw new Error("SUPABASE_URL no está configurada.");
+      if (!config.API_BASE_URL) {
+        throw new Error("La URL de la API no está configurada.");
       }
 
       const body = JSON.stringify(payload);

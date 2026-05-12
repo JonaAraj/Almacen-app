@@ -1,18 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Text, View, StyleSheet, Button } from 'react-native';
-import { Camera } from 'expo-camera';
-import { BarCodeScanner } from 'expo-barcode-scanner';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 
 export default function QrScanner({ onScan }) {
-  const [hasPermission, setHasPermission] = useState(null);
+  const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
-    })();
-  }, []);
 
   const handleBarCodeScanned = ({ type, data }) => {
     setScanned(true);
@@ -21,18 +13,29 @@ export default function QrScanner({ onScan }) {
     }
   };
 
-  if (hasPermission === null) {
-    return <Text>Solicitando permiso de cámara</Text>;
+  if (!permission) {
+    // Los permisos de la cámara aún se están cargando
+    return <View />;
   }
-  if (hasPermission === false) {
-    return <Text>No se pudo acceder a la cámara</Text>;
+
+  if (!permission.granted) {
+    // Aún no se han concedido los permisos de la cámara
+    return (
+      <View style={styles.container}>
+        <Text style={{ textAlign: 'center', color: '#F1F5F9', marginBottom: 10 }}>
+          Necesitamos tu permiso para usar la cámara
+        </Text>
+        <Button onPress={requestPermission} title="Otorgar permiso" />
+      </View>
+    );
   }
 
   return (
     <View style={styles.container}>
-      <Camera
-        onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+      <CameraView
         style={StyleSheet.absoluteFillObject}
+        barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
       />
       {scanned && <Button title={'Tocar para escanear de nuevo'} onPress={() => setScanned(false)} />}
     </View>
