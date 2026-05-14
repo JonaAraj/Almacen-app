@@ -12,7 +12,9 @@ import {
 } from "react-native";
 import * as Print from "expo-print";
 import QrScanner from "./components/QrReaderConstruct";
+import { config } from "./config";
 
+const API_BASE_URL = config.API_BASE_URL;
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 
@@ -335,24 +337,20 @@ export default function RevisionInicial({ regresar }) {
       throw new Error("La configuración de la base de datos (SUPABASE_URL) no está definida.");
     }
 
-    // Apuntamos a la tabla 'diagnosticos' y estructuramos el body según squema.sql
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/diagnosticos`, {
+    // Apuntamos al endpoint del backend para crear diagnóstico
+    const response = await fetch(`${API_BASE_URL}/api/revisiones/`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "apikey": SUPABASE_KEY,
-        "Authorization": `Bearer ${SUPABASE_KEY}`,
-        "Prefer": "return=representation",
       },
       body: JSON.stringify({
-        // Asumimos que la tabla 'diagnosticos' también tiene 'numero_serie' para poder enlazar.
         numero_serie: numeroSerie,
-        // El checklist se anida en el campo JSONB 'detalles_revision'
+        id_equipo: null,
+        id_empleado: null,
         detalles_revision: {
           ...checked,
           total_completados: totalChecked,
         },
-        // Incluimos los otros campos del schema
         estatus_final: totalChecked === ITEMS.length ? "Completado" : "Incompleto",
         observaciones_extra: null,
       }),
@@ -361,7 +359,7 @@ export default function RevisionInicial({ regresar }) {
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || "Error al guardar");
 
-    setSavedId(data[0].id_diagnostico); // El ID viene de la columna 'id_diagnostico'
+    setSavedId(data.data[0].id_diagnostico);
     Alert.alert("✅ Guardado", `Diagnóstico guardado.\nN/S: ${numeroSerie}`);
   } catch (err) {
     Alert.alert("❌ Error", err.message);
@@ -389,28 +387,32 @@ export default function RevisionInicial({ regresar }) {
     setIsScanning(false); // Ocultamos la cámara después de leer
     Alert.alert("QR Escaneado", `Número de serie: ${data}`);
 
-    // Buscar la información del producto en la base de datos
+    // Buscar la información del producto en la base de datos usando el backend
     try {
-      if (!SUPABASE_URL) {
-        Alert.alert("Error", "Variables de base de datos no definidas.");
+      const response = await fetch(`${API_BASE_URL}/api/equipos/${encodeURIComponent(data)}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        Alert.alert("Atención", "Error al buscar el equipo.");
         return;
       }
 
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/equipos?numero_serie=eq.${encodeURIComponent(data)}`, {
-        method: "GET",
-        headers: {
-          "apikey": SUPABASE_KEY,
-          "Authorization": `Bearer ${SUPABASE_KEY}`,
-        },
-      });
-      const equipo = await response.json();
-      if (equipo && equipo.length > 0) {
-        Alert.alert("Equipo encontrado", `Marca: ${equipo[0].marca}\nModelo: ${equipo[0].modelo}`);
+      const dataEquipo = await response.json();
+      if (dataEquipo.ok && dataEquipo.data?.equipo) {
+        Alert.alert(
+          "Equipo encontrado",
+          `Marca: ${dataEquipo.data.equipo.marca || "N/A"}\nModelo: ${dataEquipo.data.equipo.modelo || "N/A"}`
+        );
       } else {
         Alert.alert("Atención", "Este equipo no se encuentra registrado.");
       }
     } catch (err) {
       console.error("Error al buscar el equipo:", err);
+      Alert.alert("Error", "No se pudo conectar con el servidor.");
     }
   };
 

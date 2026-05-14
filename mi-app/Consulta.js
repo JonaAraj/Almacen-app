@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity, TextInput, StatusBar, Alert } from 'react-native';
 import QrScanner from "./components/QrReaderConstruct";
+import { config } from "./config";
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+const API_BASE_URL = config.API_BASE_URL;
 
 export default function Consulta({ regresar, serieInicial }) {
     const [searchSerie, setSearchSerie] = useState("");
@@ -34,60 +34,44 @@ export default function Consulta({ regresar, serieInicial }) {
         setConsulta(null);
         try {
             console.log(`🔍 Iniciando búsqueda para N/S: ${serieLimpiaLocal}`);
-            if (!SUPABASE_URL) {
-                Alert.alert("Error", "La URL de base de datos no está definida.");
-                return;
-            }
 
-            const headers = {
-                apikey: SUPABASE_KEY,
-                Authorization: `Bearer ${SUPABASE_KEY}`,
-                "Content-Type": "application/json",
-            };
-
-            const encodedSerie = encodeURIComponent(serieLimpiaLocal);
-            const equiposUrl = `${SUPABASE_URL}/rest/v1/equipos?select=*&numero_serie=eq.${encodedSerie}`;
-            const diagnosticosUrl = `${SUPABASE_URL}/rest/v1/diagnosticos?select=*&numero_serie=eq.${encodedSerie}&order=created_at.desc&limit=1`;
-
-            console.log("📡 Realizando peticiones GET a Supabase: equipos + diagnosticos...");
-            const [responseEquipos, responseDiagnosticos] = await Promise.all([
-                fetch(equiposUrl, { method: 'GET', headers }),
-                fetch(diagnosticosUrl, { method: 'GET', headers }),
-            ]);
-
-            console.log("📥 Status Equipos:", responseEquipos.status, "Diagnósticos:", responseDiagnosticos.status);
-
-            if (!responseEquipos.ok || !responseDiagnosticos.ok) {
-                const textEquipo = responseEquipos.ok ? null : await responseEquipos.text();
-                const textDiagnostico = responseDiagnosticos.ok ? null : await responseDiagnosticos.text();
-                console.error("Error API equipos:", textEquipo, "Error API diagnosticos:", textDiagnostico);
-                throw new Error("Error en la respuesta de la base de datos.");
-            }
-
-            const dataEquipos = await responseEquipos.json();
-            const dataDiagnosticos = await responseDiagnosticos.json();
-
-            const equipo = Array.isArray(dataEquipos) && dataEquipos.length > 0 ? dataEquipos[0] : null;
-            const diagnostico = Array.isArray(dataDiagnosticos) && dataDiagnosticos.length > 0 ? dataDiagnosticos[0] : null;
-
-            console.log("📊 Resultados:", {
-                equipo: equipo ? true : false,
-                diagnostico: diagnostico ? true : false,
+            console.log("📡 Realizando petición GET al backend: /api/equipos/:numero_serie...");
+            const response = await fetch(`${API_BASE_URL}/api/equipos/${encodeURIComponent(serieLimpiaLocal)}`, {
+                method: 'GET',
+                headers: {
+                    "Content-Type": "application/json",
+                }
             });
 
-            if (!equipo && !diagnostico) {
+            console.log("📥 Status:", response.status);
+
+            if (!response.ok) {
+                const text = await response.text();
+                console.error("Error API:", text);
+                throw new Error("Error en la respuesta del servidor.");
+            }
+
+            const dataEquipo = await response.json();
+
+            console.log("📊 Resultados:", {
+                ok: dataEquipo.ok,
+                tieneEquipo: dataEquipo.data?.equipo ? true : false,
+                tieneDiagnostico: dataEquipo.data?.diagnostico ? true : false,
+            });
+
+            if (!dataEquipo.ok || (!dataEquipo.data?.equipo && !dataEquipo.data?.diagnostico)) {
                 Alert.alert("Sin resultados", "No se encontró ningún equipo o diagnóstico con ese número de serie.");
                 return;
             }
 
             setConsulta({
-                numero_serie: serieLimpiaLocal,
-                ...equipo,
-                diagnostico,
+                numero_serie: dataEquipo.data.numero_serie,
+                ...dataEquipo.data.equipo,
+                diagnostico: dataEquipo.data.diagnostico,
             });
         } catch (err) {
             console.error(err);
-            Alert.alert("Error", "Ocurrió un error de red al buscar el equipo.");
+            Alert.alert("Error", "Ocurrió un error al buscar el equipo. Verifica que el servidor esté corriendo.");
         } finally {
             setLoading(false);
         }

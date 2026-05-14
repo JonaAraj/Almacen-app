@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity, StatusBar } from 'react-native';
+import { config } from "./config";
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+const API_BASE_URL = config.API_BASE_URL;
 
 
 export default function Historial({ numeroSerie, regresar, irAConsulta }) {
@@ -14,49 +14,28 @@ export default function Historial({ numeroSerie, regresar, irAConsulta }) {
       try {
         setLoading(true);
 
-        if (!SUPABASE_URL) {
-          throw new Error("SUPABASE_URL es undefined. Revisa que tu archivo .env use el prefijo EXPO_PUBLIC_");
+        const urlPath = numeroSerie && numeroSerie !== "GENERAL" ? numeroSerie : "GENERAL";
+        const response = await fetch(`${API_BASE_URL}/api/revisiones/historial/feed/${urlPath}`, {
+          method: 'GET',
+          headers: {
+            "Content-Type": "application/json",
+          }
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          console.error("Respuesta fallida del backend:", errText);
+          throw new Error("Error en la respuesta del servidor");
         }
+
+        const dataResponse = await response.json();
         
-        let urlEquipos = `${SUPABASE_URL}/rest/v1/equipos?select=*`;
-        let urlDiagnosticos = `${SUPABASE_URL}/rest/v1/diagnosticos?select=*`;
-
-        if (numeroSerie && numeroSerie !== "GENERAL") {
-          const encodedSerie = encodeURIComponent(numeroSerie);
-          urlEquipos += `&numero_serie=eq.${encodedSerie}`;
-          urlDiagnosticos += `&numero_serie=eq.${encodedSerie}`;
+        if (dataResponse.ok && Array.isArray(dataResponse.data)) {
+          const feed = dataResponse.data;
+          setHistorial(feed);
+        } else {
+          throw new Error("Respuesta inválida del servidor");
         }
-
-        urlEquipos += `&order=fecha_registro.desc&limit=50`;
-        urlDiagnosticos += `&order=created_at.desc&limit=50`;
-
-        const headers = {
-          "apikey": SUPABASE_KEY,
-          "Authorization": `Bearer ${SUPABASE_KEY}`,
-          "Content-Type": "application/json",
-        };
-
-        const [resEquipos, resDiagnosticos] = await Promise.all([
-          fetch(urlEquipos, { headers }),
-          fetch(urlDiagnosticos, { headers })
-        ]);
-
-        if (!resEquipos.ok || !resDiagnosticos.ok) {
-          const errText = !resEquipos.ok ? await resEquipos.text() : await resDiagnosticos.text();
-          console.error("Respuesta fallida de Supabase:", errText);
-          throw new Error("Error en la respuesta de Supabase");
-        }
-
-        const dataEquipos = await resEquipos.json();
-        const dataDiagnosticos = await resDiagnosticos.json();
-
-        const feed = [
-          ...(Array.isArray(dataEquipos) ? dataEquipos.map(e => ({ ...e, type: 'equipo', date: e.fecha_registro || e.created_at || new Date().toISOString() })) : []),
-          ...(Array.isArray(dataDiagnosticos) ? dataDiagnosticos.map(d => ({ ...d, type: 'diagnostico', date: d.created_at || new Date().toISOString() })) : [])
-        ];
-
-        feed.sort((a, b) => new Date(b.date) - new Date(a.date));
-        setHistorial(feed);
       } catch (err) {
         console.error("Error al cargar historial:", err);
       } finally {

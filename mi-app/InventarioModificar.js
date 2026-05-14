@@ -100,7 +100,7 @@ export default function InventarioModificar({ regresar, serieInicial }) {
       }
 
       const equipoResult = body?.data?.equipo || null;
-      if (equipoResult) {
+      if (body.ok && equipoResult) {
         setEquipoExiste(true);
         setOriginalSerie(equipoResult.numero_serie);
         setForm(normalizeEquipo(equipoResult));
