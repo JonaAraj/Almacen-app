@@ -72,7 +72,7 @@ export default function Registro({ regresar }) {
         "Content-Type": "application/json",
         "apikey": SUPABASE_KEY,
         "Authorization": `Bearer ${SUPABASE_KEY}`,
-        "Prefer": "return=representation", // para recibir el registro creado
+        "Prefer": "return=representation",
       },
       body: JSON.stringify({
         // Cuerpo de la petición alineado con squema.sql
